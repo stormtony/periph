@@ -705,7 +705,7 @@ func dmaWriteStreamPCM(p *Pin, w gpiostream.Stream) error {
 	}
 
 	// Calculate the number of bytes needed.
-	l := (int(w.Frequency()/f) + 7) / 8 // Bytes
+	l := (int(w.Duration()/f.Period()) + 7) / 8 // Bytes
 	buf, err := drvDMA.dmaBufAllocator((l + 0xFFF) &^ 0xFFF)
 	if err != nil {
 		return err
