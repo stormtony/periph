@@ -48,6 +48,8 @@ type BitStream struct {
 	// For example, Ethernet uses LSB-first at the byte level and MSB-first at
 	// the word level.
 	LSBF bool
+
+	Loop bool
 }
 
 // Frequency implements Stream.
