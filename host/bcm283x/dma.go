@@ -721,15 +721,20 @@ func dmaWriteStreamPCM(p *Pin, w gpiostream.Stream) error {
 	}
 	defer pCB.Close()
 	reg := drvDMA.pcmBaseAddr + 0x4 // pcmMap.fifo
-	if err = cb[0].initBlock(uint32(buf.PhysAddr()), reg, uint32(l), false, true, true, false, dmaPCMTX); err != nil {
-		return err
-	}
+	loop := false
 	switch v := w.(type) {
 	case *gpiostream.BitStream:
 		if v.Loop {
-			// loop to self
-			cb[0].nextCB = uint32(pCB.PhysAddr())
+			loop = true
 		}
+	}
+	if err = cb[0].initBlock(uint32(buf.PhysAddr()), reg, uint32(l), false, true, !loop, false, dmaPCMTX); err != nil {
+		return err
+	}
+
+	if loop {
+		// loop to self
+		cb[0].nextCB = uint32(pCB.PhysAddr())
 	}
 
 	defer drvDMA.pcmMemory.reset()
