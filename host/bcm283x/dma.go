@@ -806,8 +806,8 @@ func dmaStartStreamPCMLoop(p *Pin, w gpiostream.Stream) error {
 	if err = cb[0].initBlock(physBit, reg, uint32(l), false, true, true, false, dmaPCMTX); err != nil {
 		return err
 	}
-	/*cb[0].nextCB = physBuf + offsetBytes
-	if err = cb[1].initBlock(physBit, reg, uint32(l), false, true, true, false, dmaPCMTX); err != nil {
+	cb[0].nextCB = physBuf
+	/*if err = cb[1].initBlock(physBit, reg, uint32(l), false, true, true, false, dmaPCMTX); err != nil {
 		return err
 	}
 	cb[1].nextCB = physBuf*/
