@@ -745,30 +745,6 @@ func (p *Pin) StreamOut(s gpiostream.Stream) error {
 	return nil
 }
 
-func (p *Pin) StreamOutLoop(s gpiostream.Stream) error {
-	if drvGPIO.gpioMemory == nil {
-		return p.wrap(errors.New("subsystem gpiomem not initialized"))
-	}
-	if err := p.Out(gpio.Low); err != nil {
-		return err
-	}
-	// If the pin is I2S_DOUT, use PCM for much nicer stream and lower memory
-	// usage.
-	if p.number == 21 || p.number == 31 {
-		alt := alt0
-		if p.number == 31 {
-			alt = alt2
-		}
-		p.setFunction(alt)
-		if err := dmaStartStreamPCMLoop(p, s); err != nil {
-			return p.wrap(err)
-		}
-	} else {
-		return p.wrap(errors.New("only PCM on pin 21 and 31 implemented"))
-	}
-	return nil
-}
-
 // Drive returns the configured output current drive strength for this GPIO.
 //
 // The current drive is configurable per GPIO groups: 0~27 and 28~45.

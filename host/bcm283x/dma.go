@@ -700,6 +700,13 @@ func allocateCB(size int) ([]controlBlock, *videocore.Mem, error) {
 // dmaWriteStreamPCM streams data to a PCM enabled pin as a half-duplex I²S
 // channel.
 func dmaWriteStreamPCM(p *Pin, w gpiostream.Stream) error {
+	switch v := w.(type) {
+	case *gpiostream.BitStream:
+		if v.Loop {
+			return dmaStartStreamPCMLoop(p, w)
+		}
+	}
+
 	d := w.Duration()
 	if d == 0 {
 		return nil
