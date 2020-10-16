@@ -679,7 +679,7 @@ func startIO(pCB pmem.Mem, liteOk bool) (*dmaChannel, error) {
 	if ch == nil {
 		return nil, errors.New("bcm283x-dma: no channel available")
 	}
-	defer ch.reset()
+	//defer ch.reset()
 	ch.startIO(uint32(pCB.PhysAddr()))
 	return ch, nil
 }
