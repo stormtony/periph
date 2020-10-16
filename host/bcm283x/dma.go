@@ -792,23 +792,26 @@ func dmaStartStreamPCMLoop(p *Pin, w gpiostream.Stream) error {
 		return err
 	}
 
-	if err := copyStreamToDMABuf(w, buf.Uint32()[1:]); err != nil {
+	if err := copyStreamToDMABuf(w, buf.Uint32()[2:]); err != nil {
 		return err
 	}
 
 	//defer pCB.Close()
 	p.dmaBuf = buf
-	bufPhy := uint32(buf.PhysAddr())
-	bufPos := bufPhy + uint32(controlBlockSize*2)
+
+	offsetBytes := uint32(controlBlockSize)
+	physBuf := uint32(buf.PhysAddr())
+	physBit := physBuf + 2*offsetBytes
+
 	reg := drvDMA.pcmBaseAddr + 0x4 // pcmMap.fifo
-	if err = cb[0].initBlock(bufPos, reg, uint32(l), false, true, true, false, dmaPCMTX); err != nil {
+	if err = cb[0].initBlock(physBit, reg, uint32(l), false, true, true, false, dmaPCMTX); err != nil {
 		return err
 	}
-	cb[0].nextCB = bufPhy + uint32(controlBlockSize)
-	if err = cb[1].initBlock(bufPos, reg, uint32(l), false, true, true, false, dmaPCMTX); err != nil {
+	cb[0].nextCB = physBuf + offsetBytes
+	if err = cb[1].initBlock(physBit, reg, uint32(l), false, true, true, false, dmaPCMTX); err != nil {
 		return err
 	}
-	cb[1].nextCB = bufPhy
+	cb[1].nextCB = physBuf
 
 	//defer drvDMA.pcmMemory.reset()
 	// Start transfer
