@@ -785,14 +785,13 @@ func dmaStartStreamPCMLoop(p *Pin, w gpiostream.Stream) error {
 
 	// Calculate the number of bytes needed.
 	l := (int(w.Duration()/f.Period()) + 7) / 8 // Bytes
-	l += 2 * controlBlockSize
 
-	cb, buf, err := allocateCB(l)
+	cb, buf, err := allocateCB(l + controlBlockSize)
 	if err != nil {
 		return err
 	}
 
-	if err := copyStreamToDMABuf(w, buf.Uint32()[2:]); err != nil {
+	if err := copyStreamToDMABuf(w, buf.Uint32()[1:]); err != nil {
 		return err
 	}
 
@@ -801,7 +800,7 @@ func dmaStartStreamPCMLoop(p *Pin, w gpiostream.Stream) error {
 
 	offsetBytes := uint32(controlBlockSize)
 	physBuf := uint32(buf.PhysAddr())
-	physBit := physBuf + 2*offsetBytes
+	physBit := physBuf + offsetBytes
 
 	reg := drvDMA.pcmBaseAddr + 0x4 // pcmMap.fifo
 	if err = cb[0].initBlock(physBit, reg, uint32(l), false, true, true, false, dmaPCMTX); err != nil {
