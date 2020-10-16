@@ -668,6 +668,22 @@ func runIO(pCB pmem.Mem, liteOk bool) error {
 	return ch.wait()
 }
 
+// startIO picks a DMA channel, initialize it and runs a transfer.
+//
+func startIO(pCB pmem.Mem, liteOk bool) (*dmaChannel, error) {
+	var blacklist []int
+	if !liteOk {
+		blacklist = []int{7, 8, 9, 10, 11, 12, 13, 14, 15}
+	}
+	_, ch := pickChannel(blacklist...)
+	if ch == nil {
+		return nil, errors.New("bcm283x-dma: no channel available")
+	}
+	defer ch.reset()
+	ch.startIO(uint32(pCB.PhysAddr()))
+	return ch, nil
+}
+
 func allocateCB(size int) ([]controlBlock, *videocore.Mem, error) {
 	buf, err := drvDMA.dmaBufAllocator((size + 0xFFF) &^ 0xFFF)
 	if err != nil {
@@ -721,20 +737,9 @@ func dmaWriteStreamPCM(p *Pin, w gpiostream.Stream) error {
 	}
 	defer pCB.Close()
 	reg := drvDMA.pcmBaseAddr + 0x4 // pcmMap.fifo
-	loop := false
-	switch v := w.(type) {
-	case *gpiostream.BitStream:
-		if v.Loop {
-			loop = true
-		}
-	}
-	if err = cb[0].initBlock(uint32(buf.PhysAddr()), reg, uint32(l), false, true, !loop, false, dmaPCMTX); err != nil {
-		return err
-	}
 
-	if loop {
-		// loop to self
-		cb[0].nextCB = uint32(pCB.PhysAddr())
+	if err = cb[0].initBlock(uint32(buf.PhysAddr()), reg, uint32(l), false, true, true, false, dmaPCMTX); err != nil {
+		return err
 	}
 
 	defer drvDMA.pcmMemory.reset()
@@ -745,6 +750,64 @@ func dmaWriteStreamPCM(p *Pin, w gpiostream.Stream) error {
 	for drvDMA.pcmMemory.cs&pcmTXErr == 0 {
 		Nanospin(10 * time.Nanosecond)
 	}
+	return err
+}
+
+// dmaStartStreamPCMLoop streams data to a PCM enabled pin as a half-duplex I²S
+// channel, and loops infinitely.
+func dmaStartStreamPCMLoop(p *Pin, w gpiostream.Stream) error {
+	d := w.Duration()
+	if d == 0 {
+		return nil
+	}
+	f := w.Frequency()
+	_, _, _, actualfreq, err := calcSource(f, 1)
+	if err != nil {
+		return err
+	}
+	if actualfreq != f {
+		return errors.New("TODO(maruel): handle oversampling")
+	}
+
+	// Start clock earlier.
+	drvDMA.pcmMemory.reset()
+	_, _, err = setPCMClockSource(f)
+	if err != nil {
+		return err
+	}
+
+	// Calculate the number of bytes needed.
+	l := (int(w.Duration()/f.Period()) + 7) / 8 // Bytes
+	l += controlBlockSize
+
+	cb, buf, err := allocateCB(l)
+	if err != nil {
+		return err
+	}
+
+	if err := copyStreamToDMABuf(w, buf.Uint32()[1:]); err != nil {
+		return err
+	}
+
+	//defer pCB.Close()
+	p.dmaBuf = buf
+	bufPhy := uint32(buf.PhysAddr())
+	bufPos := bufPhy + uint32(controlBlockSize*2)
+	reg := drvDMA.pcmBaseAddr + 0x4 // pcmMap.fifo
+	if err = cb[0].initBlock(bufPos, reg, uint32(l), false, true, true, false, dmaPCMTX); err != nil {
+		return err
+	}
+	cb[0].nextCB = bufPhy + uint32(controlBlockSize)
+	if err = cb[1].initBlock(bufPos, reg, uint32(l), false, true, true, false, dmaPCMTX); err != nil {
+		return err
+	}
+	cb[1].nextCB = bufPhy
+
+	defer drvDMA.pcmMemory.reset()
+	// Start transfer
+	drvDMA.pcmMemory.set()
+	p.dmaCh, err = startIO(buf, l <= maxLite)
+
 	return err
 }
 
