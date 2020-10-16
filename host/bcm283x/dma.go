@@ -785,7 +785,7 @@ func dmaStartStreamPCMLoop(p *Pin, w gpiostream.Stream) error {
 
 	// Calculate the number of bytes needed.
 	l := (int(w.Duration()/f.Period()) + 7) / 8 // Bytes
-	l += controlBlockSize
+	l += 2 * controlBlockSize
 
 	cb, buf, err := allocateCB(l)
 	if err != nil {
@@ -810,7 +810,7 @@ func dmaStartStreamPCMLoop(p *Pin, w gpiostream.Stream) error {
 	}
 	cb[1].nextCB = bufPhy
 
-	defer drvDMA.pcmMemory.reset()
+	//defer drvDMA.pcmMemory.reset()
 	// Start transfer
 	drvDMA.pcmMemory.set()
 	p.dmaCh, err = startIO(buf, l <= maxLite)
